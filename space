@@ -1,0 +1,12 @@
+---
+- name: Run df -h /opt command on servers
+  hosts: servers
+  become: yes  # If you need elevated privileges
+  tasks:
+    - name: Check disk space of /opt
+      command: df -h /opt
+      register: disk_space
+
+    - name: Display disk space
+      debug:
+        msg: "{{ disk_space.stdout }}"
