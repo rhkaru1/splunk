@@ -1,0 +1,28 @@
+---
+- name: Uncompress tgz and change ownership
+  hosts: server1,server2
+  become: yes
+  tasks:
+    - name: Ensure target directory exists
+      file:
+        path: /opt/splnkforwarder
+        state: directory
+        owner: splnkmon
+        group: splnkmon
+        mode: '0755'
+
+    - name: Uncompress abc.tgz to /opt/splnkforwarder
+      ansible.builtin.unarchive:
+        src: /tmp/abc.tgz
+        dest: /opt/splnkforwarder
+        remote_src: yes
+        owner: splnkmon
+        group: splnkmon
+
+    - name: Set ownership for extracted files
+      file:
+        path: /opt/splnkforwarder
+        state: directory
+        recurse: yes
+        owner: splnkmon
+        group: splnkmon
