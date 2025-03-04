@@ -1,0 +1,17 @@
+---
+- name: Check available space in /opt
+  hosts: servers
+  become: yes
+  tasks:
+    - name: Get available space in /opt (compatible with RHEL5)
+      command: df -k /opt | awk 'NR==2 {print $4}'
+      register: opt_space
+
+    - name: Display available space
+      debug:
+        msg: "Available space in /opt: {{ opt_space.stdout | int // 1024 }}MB"
+
+    - name: Fail if /opt has less than 400MB free
+      fail:
+        msg: "/opt does not have enough space. Required: 400MB, Available: {{ opt_space.stdout | int // 1024 }}MB"
+      when: opt_space.stdout | int < 400000
