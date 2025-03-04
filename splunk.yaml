@@ -11,13 +11,8 @@
         group: splnkmon
         mode: '0755'
 
-    - name: Uncompress abc.tgz to /opt/splnkforwarder
-      ansible.builtin.unarchive:
-        src: /tmp/abc.tgz
-        dest: /opt/splnkforwarder
-        remote_src: yes
-        owner: splnkmon
-        group: splnkmon
+    - name: Uncompress abc.tgz using command
+      command: tar -xzf /tmp/abc.tgz -C /opt/splnkforwarder
 
     - name: Set ownership for extracted files
       file:
