@@ -21,3 +21,22 @@
         dest: /opt/splunkforwarder
         remote_src: yes
       when: splunk_package.stat.exists
+
+    - name: Copy deploymentclient.conf to Splunk Forwarder apps directory
+      copy:
+        src: /customapps/splunk/cloud/deploymentclient.conf
+        dest: /opt/splunkforwarder/etc/apps/deploymentclient.conf
+        mode: '0644'
+      when: splunk_package.stat.exists
+
+    - name: Copy user-seed.conf to Splunk Forwarder system local directory
+      copy:
+        src: /customapps/splunk/cloud/user-seed.conf
+        dest: /opt/splunkforwarder/etc/system/local/user-seed.conf
+        mode: '0644'
+      when: splunk_package.stat.exists
+
+    - name: Change ownership of /opt/splunkforwarder to splnkmon
+      command: chown -R splnkmon:splnkmon /opt/splunkforwarder
+      when: splunk_package.stat.exists
+
