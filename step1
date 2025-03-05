@@ -1,0 +1,16 @@
+---
+- name: Ensure splnk.tgz is extracted to /opt/splunkforwarder
+  hosts: all
+  become: yes
+  tasks:
+    - name: Check if /customapps/splnk.tgz exists
+      stat:
+        path: /customapps/splnk.tgz
+      register: splunk_tgz
+
+    - name: Extract splnk.tgz if it exists
+      ansible.builtin.unarchive:
+        src: /customapps/splnk.tgz
+        dest: /opt/splunkforwarder
+        remote_src: yes
+      when: splunk_tgz.stat.exists
