@@ -1,2 +1,23 @@
+---
+- name: Extract Splunk Forwarder on AIX client
+  hosts: aix_client  # Replace with your actual AIX host or group
+  become: yes  # Ensure we have the necessary privileges
+  tasks:
+    - name: Ensure destination directory exists
+      file:
+        path: /opt/splnkforwarder
+        state: directory
+        mode: '0755'
+
+    - name: Copy Splunk Forwarder tarball to AIX client
+      copy:
+        src: /tmp/splunkforwarder.tgz  # Local path on Ansible master
+        dest: /tmp/splunkforwarder.tgz  # Remote path on AIX client
+        mode: '0644'
+
+    - name: Extract Splunk Forwarder tarball
+      command: tar -xvzf /tmp/splunkforwarder.tgz -C /opt/splnkforwarder
+      args:
+        removes: /tmp/splunkforwarder.tgz  # Ensure idempotency by removing it after extraction
 
 
