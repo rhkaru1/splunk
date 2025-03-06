@@ -1,0 +1,6 @@
+- name: Ensure sudoers includes splnkmon for splunknon command
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        line: "splnkmon ALL=(ALL) NOPASSWD: /opt/splunkforwarder/bin/splunknon *"
+        validate: "/usr/sbin/visudo -cf %s"
