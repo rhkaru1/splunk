@@ -1,0 +1,29 @@
+---
+- name: Check user and disk space on AIX
+  hosts: all
+  become: yes
+  tasks:
+    - name: Check if user splnkmon exists
+      command: lsuser splnkmon
+      register: user_check
+      ignore_errors: yes
+
+    - name: Fail if user splnkmon does not exist
+      fail:
+        msg: "User splnkmon does not exist."
+      when: user_check.rc != 0
+
+    - name: Check available space in /opt
+      command: df -k /opt | awk 'NR==2 {print $3}'
+      register: disk_space
+      when: user_check.rc == 0
+
+    - name: Fail if /opt has less than 100MB free
+      fail:
+        msg: "/opt has less than 100MB of free space."
+      when: (disk_space.stdout | int / 1024) < 100
+
+    - name: Proceed with further tasks
+      debug:
+        msg: "Both conditions met, proceeding with next steps."
+      when: user_check.rc == 0 and ((disk_space.stdout | int / 1024) >= 100)
