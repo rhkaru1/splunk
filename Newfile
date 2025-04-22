@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Output CSV header
+echo "Server,CPUs,Memory,HyperThreading,CPU_OpMode,Threads,Sockets,CPU_Family,Model_Name,BIOS_Model" > output.csv
+
+# Read servers from file into array
+servers=($(cat serverlist.txt))
+
+# Loop over each server
+for server in "${servers[@]}"; do
+  echo "Processing $server..."
+
+  output=$(ssh -o ConnectTimeout=10 "$server" bash << 'EOF'
+    cpus=$(lscpu | grep "^CPU(s):" | awk '{print $2}')
+    mem_total=$(free -h | awk '/^Mem:/ {print $2}')
+    opmode=$(lscpu | grep "CPU op-mode(s):" | awk -F: '{print $2}' | xargs)
+    threads=$(lscpu | grep "Thread(s) per core:" | awk '{print $4}')
+    sockets=$(lscpu | grep "Socket(s):" | awk '{print $2}')
+    cpu_family=$(lscpu | grep "^CPU family:" | awk -F: '{print $2}' | xargs)
+    model_name=$(lscpu | grep "Model name:" | awk -F: '{print $2}' | xargs)
+
+    if [ -f /sys/devices/system/cpu/smt/active ]; then
+      smt_active=$(cat /sys/devices/system/cpu/smt/active)
+      if [ "$smt_active" -eq 1 ]; then
+        ht_status="Enabled"
+      else
+        ht_status="Disabled"
+      fi
+    else
+      ht_status="Unknown"
+    fi
+
+    if command -v dmidecode &> /dev/null && sudo -n true 2>/dev/null; then
+      bios_model=$(sudo dmidecode -s baseboard-product-name | xargs)
+    else
+      bios_model="Unavailable"
+    fi
+
+    echo "$cpus,$mem_total,$ht_status,$opmode,$threads,$sockets,$cpu_family,\"$model_name\",\"$bios_model\""
+EOF
+  )
+
+  if [ -z "$output" ]; then
+    echo "$server,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR" >> output.csv
+  else
+    echo "$server,$output" >> output.csv
+  fi
+done
