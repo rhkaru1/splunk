@@ -1,0 +1,37 @@
+For a GPFS upgrade on AIX, the short answer is: Do both, but rely on alt_disk_copy for your actual rollback plan.
+While a mksysb is your "catastrophic failure" insurance, the alt_disk_copy (cloning your rootvg to an alternate disk) is your "upgrade safety net" because it allows for a rollback in minutes rather than hours.
+________________________________________
+Comparison for GPFS Upgrade Scenarios
+Feature	alt_disk_copy (Preferred)	mksysb (Secondary)
+Recovery Time	Minutes: Change bootlist and reboot.	Hours: Boot from media/NIM and restore image.
+Ease of Rollback	Extremely Easy.	Moderate (Requires NIM or Media).
+GPFS Config	Captures /var/mmfs and /etc/filesystems.	Captures /var/mmfs and /etc/filesystems.
+Hardware Req.	Requires a spare disk in the LPAR.	Requires a NIM server or local file space.
+Best Use Case	Moving back to version 5.0 after a failed 5.2 install.	Recovering from a total system corruption or disk failure.
+________________________________________
+Why mmshutdown is critical for both
+Performing these backups after mmshutdown is essential. When the GPFS daemon is active, it frequently updates the Cluster Configuration Repository (CCR) files in /var/mmfs/gen/mmsdrfs.
+•	Consistency: mmshutdown ensures the files in /var/mmfs are in a quiescent, consistent state.
+•	Kernel Extensions: It allows for a cleaner state of the kernel extensions (mmfsenv -u) before they are captured in the backup image.
+•	LVM Stability: It ensures no GPFS-related processes are pinning filesystems in rootvg (like /var or /usr) during the clone process.
+________________________________________
+Recommended Workflow for Each Node
+1.	Quiesce the Node:
+Bash
+mmshutdown
+mmfsenv -u  # Attempt to unload kernel extensions
+2.	Create the Clone (alt_disk_copy):
+Assuming hdisk0 is your current rootvg and hdisk1 is your empty spare:
+Bash
+alt_disk_copy -d hdisk1
+Note: This creates a bootable copy. If the 5.2 upgrade fails, you simply run bootlist -m normal hdisk1 and reboot.
+3.	Create the Backup (mksysb):
+Bash
+mksysb -i /backup_dir/$(hostname)_pre_gpfs52.mksysb
+4.	Proceed with Upgrade: Install the 5.2 filesets using installp.
+________________________________________
+Important Distinction: OS vs. Data
+Neither alt_disk_copy nor mksysb backs up your actual GPFS data (the files on your shared SAN disks). They only protect the Operating System, the GPFS binaries, and the Local Configuration.
+To protect your data during the upgrade, ensure you have a GPFS Snapshot of the relevant filesystems:
+mmcrsnapshot fs0 PreUpgrade_52
+
