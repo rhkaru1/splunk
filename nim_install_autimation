@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# --- Configuration ---
+HMC_USER="hscroot"
+HMC_NAME="your_hmc_hostname"
+MANAGED_SYSTEM="System-Model-Serial" 
+NIM_MASTER_IP="192.168.1.10"
+GATEWAY="192.168.1.1"
+SUBNET_MASK="255.255.255.0"
+
+# --- 1. Create/Define the bosinst_data Resource ---
+# This ensures the install targets hdisk0 and remains non-prompted (silent)
+BID_FILE="/export/nim/hdisk0_install.bid"
+
+cat << EOF > $BID_FILE
+control_flow:
+    CONSOLE = Default
+    INSTALL_METHOD = overwrite
+    PROMPT = no
+    EXISTING_SYSTEM_OVERWRITE = yes
+
+target_disk_data:
+    HDISKNAME = hdisk0
+EOF
+
+# Define the resource in NIM if it doesn't exist
+if ! lsnim hdisk0_bid >/dev/null 2>&1; then
+    nim -o define -t bosinst_data -a server=master -a location=$BID_FILE hdisk0_bid
+fi
+
+# --- 2. Main Installation Loop ---
+# Expects servers.list format: LPAR_NAME CLIENT_IP
+while read -r LPAR_NAME CLIENT_IP; do
+    [[ -z "$LPAR_NAME" ]] && continue
+    
+    echo "------------------------------------------------------"
+    echo "Starting deployment for: $LPAR_NAME ($CLIENT_IP)"
+    
+    # Define the machine in NIM
+    nim -o define -t standalone -a if1="find_net $LPAR_NAME 0" $LPAR_NAME
+
+    # Prepare NIM for the push - adding the bosinst_data resource here
+    echo "Allocating resources and setting NIM state..."
+    nim -o bos_inst \
+        -a source=mksysb \
+        -a mksysb=72_mksysb \
+        -a spot=72_spot \
+        -a bosinst_data=hdisk0_bid \
+        -a boot_client=no \
+        -a accept_licenses=yes \
+        $LPAR_NAME
+
+    # Trigger the HMC Network Boot
+    echo "Executing lpar_netboot on HMC..."
+    ssh ${HMC_USER}@${HMC_NAME} "lpar_netboot -f -t ent -s auto -d auto -S $NIM_MASTER_IP -G $GATEWAY -C $CLIENT_IP -K $SUBNET_MASK $LPAR_NAME default $MANAGED_SYSTEM"
+
+    if [ $? -eq 0 ]; then
+        echo "SUCCESS: $LPAR_NAME is booting for installation."
+    else
+        echo "ERROR: HMC boot command failed for $LPAR_NAME."
+    fi
+
+done < servers.list
